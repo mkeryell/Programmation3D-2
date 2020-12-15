@@ -241,7 +241,9 @@ bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
     }
 
     auto t = edge2.dot(qvec)*inv_determinant;
-
+    if (t <= 0) {
+        return false;
+    }
     hit.setT(t);
     
     auto normal = (edge1.cross(edge2)).normalized();
