@@ -246,7 +246,7 @@ bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
     }
     hit.setT(t);
     
-    auto normal = (edge1.cross(edge2)).normalized();
+    auto normal = (1 - u - v)*v0.normal + u*v1.normal + v*v2.normal;
     hit.setNormal(normal);
 
     ms_itersection_count++;
@@ -267,7 +267,7 @@ bool Mesh::intersect(const Ray& ray, Hit& hit) const
             found_inter = true;
             if (tmp_hit.t() < hit.t()) {
                 hit.setT(tmp_hit.t());
-                hit.setNormal(hit.normal());
+                hit.setNormal(tmp_hit.normal());
             }
         }
     }
