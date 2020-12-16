@@ -215,6 +215,7 @@ bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
 
     auto determinant = edge1.dot(pvec);
 
+    // If determinant is close enough to 0, then the ray is considered as parallel to the face
     if (std::fabs(determinant) < Epsilon) {
         return false;
     }
@@ -246,10 +247,10 @@ bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
     }
     hit.setT(t);
     
-    auto normal = (1 - u - v)*v0.normal + u*v1.normal + v*v2.normal;
+    auto normal = ((1 - u - v)*v0.normal + u*v1.normal + v*v2.normal).normalized();
     hit.setNormal(normal);
 
-    ms_itersection_count++;
+    ++ms_itersection_count;
 
     return true;
 }
@@ -273,7 +274,6 @@ bool Mesh::intersect(const Ray& ray, Hit& hit) const
     }
     //hit.setT(tMin);
     //hit.setNormal(normal);
-    hit.setShape(this);
 
     return found_inter;
 }
