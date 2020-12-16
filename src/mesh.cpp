@@ -216,7 +216,8 @@ bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
     auto determinant = edge1.dot(pvec);
 
     // If determinant is close enough to 0, then the ray is considered as parallel to the face
-    if (std::fabs(determinant) < Epsilon) {
+    // I originally compared with 1e-4, but we missed many intersections
+    if (std::fabs(determinant) < 1e-6) {
         return false;
     }
     
