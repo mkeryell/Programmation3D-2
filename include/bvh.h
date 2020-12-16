@@ -15,7 +15,7 @@ class BVH
         Eigen::AlignedBox3f box;
         union {
             int first_child_id; // for inner nodes
-            int first_face_id;  // for leaves
+            int first_face_id; // for leaves
         };
         unsigned short nb_faces;
         short is_leaf = false;

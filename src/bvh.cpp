@@ -43,20 +43,47 @@ bool BVH::intersect(const Ray& ray, Hit& hit) const
     // compute the intersection with the root node
     float tMin, tMax;
     Normal3f n;
-    ::intersect(ray, m_nodes[0].box, tMin, tMax, n);
+    if (!::intersect(ray, m_nodes[0].box, tMin, tMax, n))
+        return false;
+
+    return intersectNode(0, ray, hit);
+    
 
     // TODO
-    // vérifier si on a bien une intersection (en fonction de tMin, tMax, et hit.t()), et si oui appeler intersecNode...
-
-    return false;
+    // vérifier si on a bien une intersection (en fonction de tMin, tMax, et hit.t()), et si oui appeler intersecNode...en fonction de tMin, tMax, et hit.t()
 }
 
 bool BVH::intersectNode(int nodeId, const Ray& ray, Hit& hit) const
 {
     // TODO, deux cas: soit mNodes[nodeId] est une feuille (il faut alors intersecter les triangles du noeud),
     // soit c'est un noeud interne (il faut visiter les fils (ou pas))
-
-    return false;
+    bool has_intersect = false;
+    const auto& node = m_nodes[nodeId];
+    if (node.is_leaf) {
+        for (int i = 0; i < node.nb_faces; ++i) {
+            Hit tmp_hit;
+            if (m_pMesh->intersectFace(ray, tmp_hit, node.first_face_id + i)) {
+                has_intersect = true;
+                if (tmp_hit.t() < hit.t()) {
+                    hit.setT(tmp_hit.t());
+                    hit.setNormal(tmp_hit.normal());
+                }
+            }
+        }
+    }
+    else {
+        for (int i = 0; i < node.nb_faces; ++i) {
+            Hit tmp_hit;
+            if (intersectNode(node.first_child_id + i, ray, tmp_hit)) {
+                has_intersect = true;
+                if (tmp_hit.t() < hit.t()) {
+                    hit.setT(tmp_hit.t());
+                    hit.setNormal(tmp_hit.normal());
+                }
+            }
+        }
+    }
+    return has_intersect;
 }
 
 /** Sorts the faces with respect to their centroid along the dimension \a dim and spliting value \a split_value.
@@ -83,8 +110,19 @@ void BVH::buildNode(int nodeId, int start, int end, int level, int targetCellSiz
 {
     Node& node = m_nodes[nodeId];
 
+
     // étape 1 : calculer la boite englobante des faces indexées de m_faces[start] à m_faces[end]
     // (Utiliser la fonction extend de Eigen::AlignedBox3f et la fonction mpMesh->vertexOfFace(int) pour obtenir les coordonnées des sommets des faces)
+    Eigen::AlignedBox3f box;
+    for (int index = start; index < end; ++index) {
+        Eigen::AlignedBox3f face_box;
+        for (int pindex = 0; pindex < 3; ++pindex) {
+            auto p = m_pMesh->vertexOfFace(index, pindex);
+            Eigen::AlignedBox3f point_box { p.position };
+            face_box.extend(point_box);
+        }
+        box.extend(face_box);
+    }
 
     // étape 2 : déterminer si il s'agit d'une feuille (appliquer les critères d'arrêts)
 
