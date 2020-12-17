@@ -123,10 +123,17 @@ void BVH::buildNode(int nodeId, int start, int end, int level, int targetCellSiz
         }
         box.extend(face_box);
     }
-
     // étape 2 : déterminer si il s'agit d'une feuille (appliquer les critères d'arrêts)
 
+    if (end - start <= targetCellSize || level == maxDepth) {
     // Si c'est une feuille, finaliser le noeud et quitter la fonction
+        node.is_leaf = true;
+        node.nb_faces = start - end;
+        node.first_face_id = start;
+        node.box = box;
+        return;
+    }
+
 
     // Si c'est un noeud interne :
 
