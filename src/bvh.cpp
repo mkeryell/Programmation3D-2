@@ -43,11 +43,10 @@ bool BVH::intersect(const Ray& ray, Hit& hit) const
     // compute the intersection with the root node
     float tMin, tMax;
     Normal3f n;
-    if (!::intersect(ray, m_nodes[0].box, tMin, tMax, n))
-        return false;
-
-    return intersectNode(0, ray, hit);
+    if (::intersect(ray, m_nodes[0].box, tMin, tMax, n))
+        return intersectNode(0, ray, hit);
     
+    return false;
 
     // TODO
     // vérifier si on a bien une intersection (en fonction de tMin, tMax, et hit.t()), et si oui appeler intersecNode...en fonction de tMin, tMax, et hit.t()
@@ -55,13 +54,21 @@ bool BVH::intersect(const Ray& ray, Hit& hit) const
 
 bool BVH::intersectNode(int nodeId, const Ray& ray, Hit& hit) const
 {
-
+    const Node& node = m_nodes[nodeId];
 
     // TODO, deux cas: soit mNodes[nodeId] est une feuille (il faut alors intersecter les triangles du noeud),
     // soit c'est un noeud interne (il faut visiter les fils (ou pas))
     bool has_intersect = false;
-    const auto& node = m_nodes[nodeId];
-
+    auto setIntersect = [&] (auto&& f) {
+        Hit tmp_hit;
+        if (f(tmp_hit)) {
+            has_intersect = true;
+            if (tmp_hit.t() < hit.t()) {
+                hit.setT(tmp_hit.t());
+                hit.setNormal(tmp_hit.normal());
+            }
+        }
+    };
     float tMin, tMax;
     Normal3f normal;
 
@@ -69,28 +76,24 @@ bool BVH::intersectNode(int nodeId, const Ray& ray, Hit& hit) const
         return false;
 
     if (node.is_leaf) {
-        for (int i = 0; i < node.nb_faces; ++i) {
-            Hit tmp_hit;
-            if (m_pMesh->intersectFace(ray, tmp_hit, node.first_face_id + i)) {
-                has_intersect = true;
-                if (tmp_hit.t() < hit.t()) {
-                    hit.setT(tmp_hit.t());
-                    hit.setNormal(tmp_hit.normal());
-                }
-            }
-        }
+        for (int i = 0; i < node.nb_faces; ++i)
+            setIntersect([&] (auto& tmp_hit) {
+                return m_pMesh->intersectFace(ray, tmp_hit, node.first_face_id + i) && tmp_hit.t() > 0;
+            });
     }
     else {
-        for (int i = 0; i < node.nb_faces; ++i) {
-            Hit tmp_hit;
-            if (intersectNode(node.first_child_id + i, ray, tmp_hit)) {
-                has_intersect = true;
-                if (tmp_hit.t() < hit.t()) {
-                    hit.setT(tmp_hit.t());
-                    hit.setNormal(tmp_hit.normal());
-                }
-            }
-        }
+        float tMin1, tMin2, tMax1, tMax2;
+        Normal3f normal1, normal2;
+        int index1 = node.first_child_id;
+        int index2 = node.first_child_id + 1;
+        // std::cout << nodeId << " " << index1 << " " << index2 << " " << node.is_leaf << std::endl;
+        // std::cout << nodeId << ' ' << (void*) &node << " " << node.first_child_id << std::endl;
+
+        //std::terminate();
+        if (::intersect(ray, m_nodes[index1].box, tMin1, tMax1, normal1))
+            setIntersect([&] (auto& tmp_hit) { return intersectNode(index1, ray, tmp_hit); });
+        if (::intersect(ray, m_nodes[index2].box, tMin2, tMax2, normal2))
+            setIntersect([&] (auto& tmp_hit) { return intersectNode(index2, ray, tmp_hit); });
     }
     return has_intersect;
 }
@@ -117,20 +120,12 @@ int BVH::split(int start, int end, int dim, float split_value)
 
 void BVH::buildNode(int nodeId, int start, int end, int level, int targetCellSize, int maxDepth)
 {
-    auto &node = m_nodes[nodeId];
-
-
     // étape 1 : calculer la boite englobante des faces indexées de m_faces[start] à m_faces[end]
     // (Utiliser la fonction extend de Eigen::AlignedBox3f et la fonction mpMesh->vertexOfFace(int) pour obtenir les coordonnées des sommets des faces)
-    Eigen::AlignedBox3f box;
+    // Initialize box with first vertex of first face
+    Eigen::AlignedBox3f box { m_pMesh->vertexOfFace(start, 0).position };
     for (int index = start; index < end; ++index) {
-        int pindex = 0;
-        if (index == start) {
-            auto p1 = m_pMesh->vertexOfFace(index, 0);
-            Eigen::AlignedBox3f box { p1.position };
-            pindex = 1;
-        }
-        for (; pindex < 3; ++pindex) {
+        for (int pindex = 0; pindex < 3; ++pindex) {
             auto p = m_pMesh->vertexOfFace(index, pindex);
             box.extend(p.position);
         }
@@ -139,10 +134,10 @@ void BVH::buildNode(int nodeId, int start, int end, int level, int targetCellSiz
 
     if (end - start <= targetCellSize || level >= maxDepth) {
     // Si c'est une feuille, finaliser le noeud et quitter la fonction
-        node.is_leaf = true;
-        node.nb_faces = start - end;
-        node.first_face_id = start;
-        node.box = box;
+        m_nodes[nodeId].is_leaf = true;
+        m_nodes[nodeId].nb_faces = end - start;
+        m_nodes[nodeId].first_face_id = start;
+        m_nodes[nodeId].box = box;
         return;
     }
 
@@ -167,24 +162,16 @@ void BVH::buildNode(int nodeId, int start, int end, int level, int targetCellSiz
     auto split_value = (max_corner(dim) + min_corner(dim)) / 2;
 
     // étape 4 : appeler la fonction split pour trier (partiellement) les faces et vérifier si le split a été utile
-    auto mid_id = split(start, end, dim, split_value); //Utile???
+    auto mid_id = split(start, end, dim, split_value);
 
     // étape 5 : allouer les fils, et les construire en appelant buildNode...
-    Node firstChild {};
-    //firstChild.first_face_id = start;
-    //firstChild.nb_faces = mid_id - start;
+    m_nodes.push_back({});
+    m_nodes.push_back({});
 
-    Node secondChild {};
-    //secondChild.first_face_id = mid_id;
-    //secondChild.nb_faces = end - mid_id;
+    m_nodes[nodeId].first_child_id = m_nodes.size() - 2;
+    m_nodes[nodeId].box = box;
+    m_nodes[nodeId].nb_faces = end - start;
 
-    m_nodes.push_back(firstChild);
-    m_nodes.push_back(secondChild);
-    
-    node.first_child_id = m_nodes.size() - 2;
-    node.box = box;
-    node.nb_faces = 2;
-
-    buildNode(m_nodes.size() - 2, start, mid_id, level+1, targetCellSize, maxDepth);
-    buildNode(m_nodes.size() - 1, mid_id, end, level+1, targetCellSize, maxDepth);
+    buildNode(m_nodes[nodeId].first_child_id, start, mid_id, level+1, targetCellSize, maxDepth);
+    buildNode(m_nodes[nodeId].first_child_id + 1, mid_id, end, level+1, targetCellSize, maxDepth);
 }
