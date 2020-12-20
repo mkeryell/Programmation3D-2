@@ -50,7 +50,9 @@ bool Plane::intersect(const Ray& ray, Hit& hit) const
             u = u.normalized();
             auto v = m_normal.cross(u).normalized();
 
-            auto colinear_vector = ray.at(solution) - plane_p;
+            // Using auto in this case triggers a bug in Eigen (AddressSanitizer: stack-use-after-scope)
+            //auto colinear_vector = ray.at(solution) - plane_p;
+            Vector3f colinear_vector = ray.at(solution) - plane_p;
             auto p_u = u.dot(colinear_vector);
             auto p_v = v.dot(colinear_vector);
 
