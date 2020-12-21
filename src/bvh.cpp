@@ -86,14 +86,21 @@ bool BVH::intersectNode(int nodeId, const Ray& ray, Hit& hit) const
         Normal3f normal1, normal2;
         int index1 = node.first_child_id;
         int index2 = node.first_child_id + 1;
-        // std::cout << nodeId << " " << index1 << " " << index2 << " " << node.is_leaf << std::endl;
-        // std::cout << nodeId << ' ' << (void*) &node << " " << node.first_child_id << std::endl;
+        bool has_intersect1 = ::intersect(ray, m_nodes[index1].box, tMin1, tMax1, normal1) && hit.t() >= tMin1;
+        bool has_intersect2 = ::intersect(ray, m_nodes[index2].box, tMin2, tMax2, normal2) && hit.t() >= tMin2;
 
-        //std::terminate();
-        if (::intersect(ray, m_nodes[index1].box, tMin1, tMax1, normal1))
-            setIntersect([&] (auto& tmp_hit) { return intersectNode(index1, ray, tmp_hit); });
-        if (::intersect(ray, m_nodes[index2].box, tMin2, tMax2, normal2))
-            setIntersect([&] (auto& tmp_hit) { return intersectNode(index2, ray, tmp_hit); });
+        if (tMin1 <= tMin2) {
+            if (has_intersect1)
+                setIntersect([&] (auto& tmp_hit) { return intersectNode(index1, ray, tmp_hit); });
+            if (has_intersect2 && hit.t() >= tMin2)
+                setIntersect([&] (auto& tmp_hit) { return intersectNode(index2, ray, tmp_hit); });
+        }
+        else {
+            if (has_intersect2)
+                setIntersect([&] (auto& tmp_hit) { return intersectNode(index2, ray, tmp_hit); });
+            if (has_intersect1 && hit.t() >= tMin1)
+                setIntersect([&] (auto& tmp_hit) { return intersectNode(index1, ray, tmp_hit); });
+        }
     }
     return has_intersect;
 }
