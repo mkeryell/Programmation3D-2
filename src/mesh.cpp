@@ -201,6 +201,7 @@ long int Mesh::ms_itersection_count = 0;
 
 bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
 {
+    ++ms_itersection_count;
     auto v0 = vertexOfFace(faceId, 0);
     auto v1 = vertexOfFace(faceId, 1);
     auto v2 = vertexOfFace(faceId, 2);
@@ -251,8 +252,6 @@ bool Mesh::intersectFace(const Ray& ray, Hit& hit, int faceId) const
     auto normal = ((1 - u - v)*v0.normal + u*v1.normal + v*v2.normal).normalized();
     hit.setNormal(normal);
 
-    ++ms_itersection_count;
-
     return true;
 }
 
@@ -267,7 +266,7 @@ bool Mesh::intersect(const Ray& ray, Hit& hit) const
     //std::cout  << "trying intersection with bvh:" << std::endl;
     return m_BVH->intersect(ray, hit);
     
-    /*
+    
     for (long unsigned int i = 0; i < m_faces.size(); ++i) {
         if (intersectFace(ray, tmp_hit, i)) {
             found_inter = true;
@@ -276,11 +275,11 @@ bool Mesh::intersect(const Ray& ray, Hit& hit) const
                 hit.setNormal(tmp_hit.normal());
             }
         }
-    }*/
+    }
     //hit.setT(tMin);
     //hit.setNormal(normal);
 
-    //return found_inter;
+    return found_inter;
 }
 
 std::string Mesh::toString() const {

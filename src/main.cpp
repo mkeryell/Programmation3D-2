@@ -1,4 +1,5 @@
 #include "viewer.h"
+#include "mesh.h"
 
 #include <filesystem/resolver.h>
 
@@ -46,7 +47,7 @@ void render(Scene* scene, ImageBlock* result, std::string outputName, bool* done
 
     t = clock() - t;
     std::cout << "Raytracing time : " << float(t)/CLOCKS_PER_SEC << "s"<<std::endl;
-
+    std::cout << "Number of mesh face intersection : " << Mesh::ms_itersection_count << std::endl;
     *done = true;
 }
 

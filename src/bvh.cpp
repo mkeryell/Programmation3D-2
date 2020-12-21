@@ -55,7 +55,7 @@ bool BVH::intersect(const Ray& ray, Hit& hit) const
 bool BVH::intersectNode(int nodeId, const Ray& ray, Hit& hit) const
 {
     const Node& node = m_nodes[nodeId];
-
+    // std::cout << "min : " << node.box.min() << " max : " << node.box.max() << std::endl;
     // TODO, deux cas: soit mNodes[nodeId] est une feuille (il faut alors intersecter les triangles du noeud),
     // soit c'est un noeud interne (il faut visiter les fils (ou pas))
     bool has_intersect = false;
@@ -72,13 +72,13 @@ bool BVH::intersectNode(int nodeId, const Ray& ray, Hit& hit) const
     float tMin, tMax;
     Normal3f normal;
 
-    if( (!::intersect(ray, node.box, tMin, tMax, normal)) || tMin>hit.t())
+    if (!::intersect(ray, node.box, tMin, tMax, normal))
         return false;
 
     if (node.is_leaf) {
         for (int i = 0; i < node.nb_faces; ++i)
             setIntersect([&] (auto& tmp_hit) {
-                return m_pMesh->intersectFace(ray, tmp_hit, node.first_face_id + i) && tmp_hit.t() > 0;
+                return m_pMesh->intersectFace(ray, tmp_hit, m_faces[node.first_face_id + i]) && tmp_hit.t() > 0;
             });
     }
     else {
@@ -123,10 +123,10 @@ void BVH::buildNode(int nodeId, int start, int end, int level, int targetCellSiz
     // étape 1 : calculer la boite englobante des faces indexées de m_faces[start] à m_faces[end]
     // (Utiliser la fonction extend de Eigen::AlignedBox3f et la fonction mpMesh->vertexOfFace(int) pour obtenir les coordonnées des sommets des faces)
     // Initialize box with first vertex of first face
-    Eigen::AlignedBox3f box { m_pMesh->vertexOfFace(start, 0).position };
+    Eigen::AlignedBox3f box { m_pMesh->vertexOfFace(m_faces[start], 0).position };
     for (int index = start; index < end; ++index) {
         for (int pindex = 0; pindex < 3; ++pindex) {
-            auto p = m_pMesh->vertexOfFace(index, pindex);
+            auto p = m_pMesh->vertexOfFace(m_faces[index], pindex);
             box.extend(p.position);
         }
     }
